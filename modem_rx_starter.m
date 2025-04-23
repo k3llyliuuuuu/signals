@@ -7,7 +7,7 @@ xlabel('Sample Index');
 ylabel('Amplitude');
 grid on;
 start_idx = find_start_of_signal(y_r, x_sync);
-data_start = start_idx + length(x_sync) + 100;  % skip sync and add a small buffer
+data_start = start_idx + length(x_sync) ;  % skip sync and add a small buffer
 y_t = y_r(data_start:end);
 %% Parameters modem_tx.m
 fc = 1000;        
