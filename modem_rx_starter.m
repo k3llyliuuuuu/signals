@@ -1,3 +1,4 @@
+clear; clc;
 load short_modem_rx.mat
 load sync_noise.mat  
 figure;
@@ -35,19 +36,19 @@ ref = StringToBits('Hello');
 best_msg = '';
 best_score = 0;
 
-for offset = -15:15
-    x_d = zeros(1, bits_expected);
+for offset = -15:15 % try 31 different timing offsets
+    x_d = zeros(1, bits_expected); % at each offset, samples 40 bits from the signal
     for k = 1:bits_expected
         idx = round((k - 0.5) * SymbolPeriod) + offset;
         if idx > 0 && idx <= length(m_baseband)
             x_d(k) = m_baseband(idx) > 0;
         end
     end
-    score = sum(x_d == ref);
+    score = sum(x_d == ref); % compares those bits to the binary form of "Hello"
     if score > best_score
         best_score = score;
         best_msg = BitsToString(x_d);
-        best_offset = offset;
+        best_offset = offset; % keeps the one with the most matching bits
     end
 end
 %% Decode bits to string
