@@ -7,7 +7,7 @@ xlabel('Sample Index');
 ylabel('Amplitude');
 grid on;
 start_idx = find_start_of_signal(y_r, x_sync);
-data_start = 40000;  
+data_start = start_idx + length(x_sync) + 100;  % skip sync and add a small buffer
 y_t = y_r(data_start:end);
 %% Parameters modem_tx.m
 fc = 1000;        
@@ -16,34 +16,40 @@ SymbolPeriod = 100;
 %% Step 1: Coherent demodulation (multiply by cosine)
 t = (0:length(y_t)-1)' / Fs;
 y_demod = y_t .* cos(2*pi*fc*t);
-%% Step 2: FIR lowpass filter
-lpFilt = designfilt('lowpassfir', ...
-    'PassbandFrequency', 200, ...
-    'StopbandFrequency', 500, ...
-    'SampleRate', Fs);
-m_baseband = filter(lpFilt, y_demod);
-%% Step 3: Normalize
-m_baseband = m_baseband / max(abs(m_baseband));
-%% Step 4: Plot to inspect signal
+%% Step 2: Apply truncated ideal LPF (sinc-based FIR)
+k = -20:20;                 % 51-point filter
+Omegac = pi/3;              % cutoff
+h = (Omegac/pi) * sinc((Omegac/pi)*k);  % impulse response
+
+m_baseband = conv(y_demod, h, 'same');  % apply filter
+m_baseband = m_baseband / max(abs(m_baseband));  % normalize
+%% Step 3: Plot to inspect signal
 figure;
 plot(data_start + (0:length(m_baseband)-1), m_baseband);
 title('Demodulated Baseband Signal m(t)');
 xlabel('Sample Index (relative to y\_r)');
 ylabel('Amplitude');
 %% Bit extraction
-SymbolPeriod = 100;
 bits_expected = 5 * 8;  % "Hello" = 5 characters
+ref = StringToBits('Hello');
+best_msg = '';
+best_score = 0;
 
-x_d = zeros(1, bits_expected);
-offset = -10;  
-
-for k = 1:bits_expected
-    idx = round((k - 0.5) * SymbolPeriod) + offset;
-    if idx > 0 && idx <= length(m_baseband)
-        x_d(k) = m_baseband(idx) > 0;  % 1 if sample > 0, else 0
+for offset = -15:15
+    x_d = zeros(1, bits_expected);
+    for k = 1:bits_expected
+        idx = round((k - 0.5) * SymbolPeriod) + offset;
+        if idx > 0 && idx <= length(m_baseband)
+            x_d(k) = m_baseband(idx) > 0;
+        end
+    end
+    score = sum(x_d == ref);
+    if score > best_score
+        best_score = score;
+        best_msg = BitsToString(x_d);
+        best_offset = offset;
     end
 end
-
 %% Decode bits to string
 decoded = BitsToString(x_d);
 disp("Decoded Message: " + decoded);
